@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>MTR France Addon</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+        th, td { border: 1px solid #000; padding: 8px; text-align: left; }
+        th { background-color: #f0f0f0; }
+        input[type="text"], input[type="number"] { width: 100%; box-sizing: border-box; }
+        button { padding: 5px 10px; margin-top: 5px; }
+    </style>
+</head>
+<body>
+<h1>Routes MTR France</h1>
+<table id="routes-table">
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>Nom</th>
+        <th>Couleur</th>
+        <th>Description</th>
+        <th>Priorité</th>
+        <th>Action</th>
+    </tr>
+    </thead>
+    <tbody>
+    </tbody>
+</table>
+
+<script>
+    async function chargerRoutes() {
+        try {
+            const res = await fetch('/mtr-france-addon');
+            const data = await res.json();
+            afficherTableau(data);
+        } catch(e) {
+            console.error("Erreur fetch routes:", e);
+        }
+    }
+
+    function afficherTableau(routes) {
+        const tbody = document.querySelector('#routes-table tbody');
+        tbody.innerHTML = '';
+
+        Object.entries(routes).forEach(([id, route]) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${id}</td>
+                <td>${route.name}</td>
+                <td style="background-color:#${Number(route.color).toString(16).padStart(6,'0')}">${route.color}</td>
+                <td><input type="text" value="${route.description || ''}" /></td>
+                <td><input type="number" value="${route.priority || 0}" /></td>
+                <td><button onclick="updateRoute(${id}, this)">Sauvegarder</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    async function updateRoute(id, button) {
+        const tr = button.closest('tr');
+        const description = tr.querySelector('input[type="text"]').value;
+        const priority = parseInt(tr.querySelector('input[type="number"]').value) || 0;
+
+        const payload = { id: id, description, priority };
+
+        try {
+            const res = await fetch('/mtr-france-addon', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.status === 'ok') {
+                alert('Mise à jour réussie !');
+            } else {
+                alert('Erreur lors de la mise à jour.');
+            }
+        } catch(e) {
+            console.error(e);
+            alert('Erreur réseau.');
+        }
+    }
+
+    window.onload = chargerRoutes;
+</script>
+</body>
+</html>

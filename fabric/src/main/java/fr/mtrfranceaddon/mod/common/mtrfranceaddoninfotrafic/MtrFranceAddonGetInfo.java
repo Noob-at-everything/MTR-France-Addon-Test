@@ -1,57 +1,61 @@
 package fr.mtrfranceaddon.mod.common.mtrfranceaddoninfotrafic;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.world.ClientWorld;
-import org.mtr.core.data.SimplifiedRoute;
-import org.mtr.mod.client.MinecraftClientData;
-import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectAVLTreeSet;
-
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
+import org.mtr.mod.client.MinecraftClientData;
+import org.mtr.core.data.SimplifiedRoute;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
+import java.lang.reflect.Type;
+import java.util.HashMap;
+import java.util.Map;
 
 public class MtrFranceAddonGetInfo {
 
-    private long lastUpdate = 0; // Timer pour mise à jour toutes les 10 sec
-    private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    private static final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    private static final Map<Long, CustomRouteInfo> customRoutes = new HashMap<>();
+    private static File jsonFile;
 
-    // Vérifie si 10 secondes se sont écoulées
-    public boolean canUpdate() {
-        return System.currentTimeMillis() - lastUpdate >= 10000;
+    // Initialisation avec le dossier du monde
+    public static void init(File worldDir) {
+        File folder = new File(worldDir, "mtrfranceaddon");
+        if (!folder.exists()) folder.mkdirs();
+        jsonFile = new File(folder, "routes.json");
+
+        if (jsonFile.exists()) {
+            try (FileReader reader = new FileReader(jsonFile)) {
+                Type type = new TypeToken<Map<Long, CustomRouteInfo>>(){}.getType();
+                Map<Long, CustomRouteInfo> loaded = gson.fromJson(reader, type);
+                if (loaded != null) customRoutes.putAll(loaded);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
-    // Enregistre toutes les routes dans un fichier JSON
-    public void logAllRoutes() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        ClientWorld world = client.world;
-        if (world == null) return;
+    // Récupérer toutes les routes avec infos personnalisées
+    public static Map<Long, CustomRouteInfo> getAllCustomRoutes() {
+        MinecraftClientData.getInstance().simplifiedRoutes.forEach(route -> {
+            customRoutes.putIfAbsent(route.getId(),
+                    new CustomRouteInfo(route.getId(), route.getName(), route.getColor()));
+        });
+        return customRoutes;
+    }
 
-        // Déterminer le nom du dossier du monde
-        String worldFolderName;
-        if (client.getServer() != null) { // Solo
-            worldFolderName = client.getServer().getSaveProperties().getLevelName();
-        } else { // Multi
-            worldFolderName = world.getRegistryKey().getValue().getPath();
-        }
+    // Ajouter/modifier une route personnalisée
+    public static void updateCustomRoute(long id, CustomRouteInfo info) {
+        customRoutes.put(id, info);
+        save();
+    }
 
-        // Créer le dossier mtrfranceaddon dans le dossier du monde
-        File logDir = new File(client.runDirectory, "saves/" + worldFolderName + "/mtrfranceaddon");
-        if (!logDir.exists()) logDir.mkdirs();
-
-        File logFile = new File(logDir, "routes.json");
-
-        ObjectAVLTreeSet<SimplifiedRoute> routesSet = MinecraftClientData.getInstance().simplifiedRoutes;
-
-        try (FileWriter writer = new FileWriter(logFile)) {
-            gson.toJson(routesSet, writer);
+    // Sauvegarder sur disque
+    private static void save() {
+        if (jsonFile == null) return;
+        try (FileWriter writer = new FileWriter(jsonFile)) {
+            gson.toJson(customRoutes, writer);
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-        lastUpdate = System.currentTimeMillis();
     }
 }
-
