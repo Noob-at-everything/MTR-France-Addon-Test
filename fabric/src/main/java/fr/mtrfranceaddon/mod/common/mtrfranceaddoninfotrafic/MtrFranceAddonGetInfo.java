@@ -45,12 +45,12 @@ public class MtrFranceAddonGetInfo {
 
     // Récupérer toutes les routes avec infos personnalisées
     public static Map<Long, CustomRouteInfo> getAllCustomRoutes() {
-        MinecraftClientData.getInstance().simplifiedRoutes.forEach(route -> {
-            customRoutes.putIfAbsent(route.getId(),
-                    new CustomRouteInfo(route.getId(), route.getName(), route.getColor()));
-        });
+        for (SimplifiedRoute route : MinecraftClientData.getInstance().simplifiedRoutes) {
+            customRoutes.putIfAbsent(route.getId(), new CustomRouteInfo(route.getId(), route.getName(), route.getColor()));
+        }
         return customRoutes;
     }
+
 
     // Ajouter/modifier une route personnalisée
     public static void updateCustomRoute(long id, CustomRouteInfo info) {

@@ -9,5 +9,4 @@ public class MTRFranceAddonFabric implements ModInitializer {
     public void onInitialize() {
         Init.init();
     }
-
 }
