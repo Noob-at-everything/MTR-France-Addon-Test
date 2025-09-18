@@ -17,12 +17,21 @@ public class MtrFranceAddonGetInfo {
     private static final Map<Long, CustomRouteInfo> customRoutes = new HashMap<>();
     private static File jsonFile;
 
-    // Initialisation avec le dossier du monde
+    // Charger depuis le disque
     public static void init(File worldDir) {
         File folder = new File(worldDir, "mtrfranceaddon");
         if (!folder.exists()) folder.mkdirs();
         jsonFile = new File(folder, "routes.json");
 
+        if (!jsonFile.exists()) {
+            Map<Long, CustomRouteInfo> initial = new HashMap<>();
+            initial.put(1L, new CustomRouteInfo(1L, "Ligne test", 0x00FF00));
+            try (FileWriter writer = new FileWriter(jsonFile)) {
+                gson.toJson(initial, writer);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
         if (jsonFile.exists()) {
             try (FileReader reader = new FileReader(jsonFile)) {
                 Type type = new TypeToken<Map<Long, CustomRouteInfo>>(){}.getType();

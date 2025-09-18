@@ -8,12 +8,12 @@
         table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
         th, td { border: 1px solid #000; padding: 8px; text-align: left; }
         th { background-color: #f0f0f0; }
-        input[type="text"], input[type="number"] { width: 100%; box-sizing: border-box; }
+        input, select { width: 100%; box-sizing: border-box; }
         button { padding: 5px 10px; margin-top: 5px; }
     </style>
 </head>
 <body>
-<h1>Routes MTR France</h1>
+<h1>🚉 Routes MTR France</h1>
 <table id="routes-table">
     <thead>
     <tr>
@@ -25,65 +25,119 @@
         <th>Action</th>
     </tr>
     </thead>
-    <tbody>
-    </tbody>
+    <tbody></tbody>
 </table>
 
+<h1>⚠️ Alertes</h1>
+<table id="alerts-table">
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>Message</th>
+        <th>Gravité</th>
+        <th>Action</th>
+    </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+<button onclick="ajouterAlerte()">➕ Ajouter une alerte</button>
+
 <script>
-    async function chargerRoutes() {
-        try {
-            const res = await fetch('/mtr-france-addon');
-            const data = await res.json();
-            afficherTableau(data);
-        } catch(e) {
-            console.error("Erreur fetch routes:", e);
-        }
+    function chargerRoutes() {
+    fetch('/mtr-france-addon')
+        .then(res => res.json())
+        .then(data => afficherTableau(data))
+        .catch(err => console.error('Erreur fetch routes:', err));
+}
+    // === ROUTES ===
+    function afficherRoutes(routes) {
+      const tbody = document.querySelector('#routes-table tbody');
+      tbody.innerHTML = '';
+      Object.entries(routes).forEach(([id, route]) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${id}</td>
+          <td>${route.name}</td>
+          <td style="background-color:#${route.color.toString(16).padStart(6,'0')}">${route.color}</td>
+          <td><input type="text" value="${route.description || ''}" /></td>
+          <td><input type="number" value="${route.priority || 0}" /></td>
+          <td><button onclick="updateRoute('${id}', this)">Sauvegarder</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
     }
 
-    function afficherTableau(routes) {
-        const tbody = document.querySelector('#routes-table tbody');
-        tbody.innerHTML = '';
+    function updateRoute(id, button) {
+      const tr = button.closest('tr');
+      const description = tr.querySelector('input[type="text"]').value;
+      const priority = parseInt(tr.querySelector('input[type="number"]').value) || 0;
 
-        Object.entries(routes).forEach(([id, route]) => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${id}</td>
-                <td>${route.name}</td>
-                <td style="background-color:#${Number(route.color).toString(16).padStart(6,'0')}">${route.color}</td>
-                <td><input type="text" value="${route.description || ''}" /></td>
-                <td><input type="number" value="${route.priority || 0}" /></td>
-                <td><button onclick="updateRoute(${id}, this)">Sauvegarder</button></td>
-            `;
-            tbody.appendChild(tr);
+      const payload = { type: "route", id, description, priority };
+
+      fetch('/mtr-france-addon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(r => r.json()).then(d => console.log("Maj route:", d));
+    }
+
+    // === ALERTES ===
+    function afficherAlertes(alertes) {
+      const tbody = document.querySelector('#alerts-table tbody');
+      tbody.innerHTML = '';
+      Object.entries(alertes).forEach(([id, alert]) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${id}</td>
+          <td><input type="text" value="${alert.message}" /></td>
+          <td>
+            <select>
+              <option value="info" ${alert.severity==="info"?"selected":""}>Info</option>
+              <option value="warning" ${alert.severity==="warning"?"selected":""}>Avertissement</option>
+              <option value="critical" ${alert.severity==="critical"?"selected":""}>Critique</option>
+            </select>
+          </td>
+          <td><button onclick="updateAlerte('${id}', this)">Sauvegarder</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function ajouterAlerte() {
+      const id = Date.now();
+      const payload = { type: "alert", id, message: "Nouvelle alerte", severity: "info" };
+      fetch('/mtr-france-addon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(() => charger());
+    }
+
+    function updateAlerte(id, button) {
+      const tr = button.closest('tr');
+      const message = tr.querySelector('input').value;
+      const severity = tr.querySelector('select').value;
+
+      const payload = { type: "alert", id, message, severity };
+
+      fetch('/mtr-france-addon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(() => charger());
+    }
+
+    // === CHARGER LES DONNÉES ===
+    function charger() {
+      fetch('/mtr-france-addon')
+        .then(r => r.json())
+        .then(data => {
+          afficherRoutes(data.routes || {});
+          afficherAlertes(data.alerts || {});
         });
     }
 
-    async function updateRoute(id, button) {
-        const tr = button.closest('tr');
-        const description = tr.querySelector('input[type="text"]').value;
-        const priority = parseInt(tr.querySelector('input[type="number"]').value) || 0;
-
-        const payload = { id: id, description, priority };
-
-        try {
-            const res = await fetch('/mtr-france-addon', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-            if (data.status === 'ok') {
-                alert('Mise à jour réussie !');
-            } else {
-                alert('Erreur lors de la mise à jour.');
-            }
-        } catch(e) {
-            console.error(e);
-            alert('Erreur réseau.');
-        }
-    }
-
-    window.onload = chargerRoutes;
+    window.onload = charger;
 </script>
 </body>
 </html>
