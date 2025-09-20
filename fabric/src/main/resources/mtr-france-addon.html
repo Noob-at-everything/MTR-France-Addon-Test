@@ -1,1 +1,262 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Gestion des Alertes - MTR France Addon</title>
+    <style>
+        /* Reset et box-sizing */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
+            html, body {
+         width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        }
+
+        *, *::before, *::after {
+          box-sizing: border-box;
+        }
+
+
+        /* Titres */
+        h1 { margin-bottom: 20px; }
+        h3 { margin-top: 30px; margin-bottom: 10px; }
+
+        /* Formulaire */
+        form label { display: block; margin-bottom: 5px; }
+        form input, form select { width: 100%; padding: 6px; margin-bottom: 15px; }
+
+        /* Tableau */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            max-width: 100%;
+            background-color: #fff;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #000;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f0f0f0;
+        }
+
+        /* Couleurs gravité */
+        .critical { background-color: #ffcccc; }
+        .warning { background-color: #fff3cd; }
+        .info { background-color: #cce5ff; }
+        .stop { background-color: #ff9999; font-weight: bold; }
+
+        /* Boutons */
+        button {
+            padding: 6px 12px;
+            margin-right: 5px;
+            cursor: pointer;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            table, thead, tbody, th, td, tr {
+                display: block;
+            }
+            tr { margin-bottom: 15px; border-bottom: 2px solid #ccc; }
+            th, td { text-align: right; padding-left: 50%; position: relative; }
+            th::before, td::before {
+                position: absolute;
+                left: 10px;
+                width: 45%;
+                white-space: nowrap;
+                text-align: left;
+                font-weight: bold;
+            }
+            th:nth-of-type(1)::before { content: "ID"; }
+            th:nth-of-type(2)::before { content: "Message"; }
+            th:nth-of-type(3)::before { content: "Gravité"; }
+            th:nth-of-type(4)::before { content: "Ligne"; }
+            th:nth-of-type(5)::before { content: "Actions"; }
+            td:nth-of-type(1)::before { content: "ID"; }
+            td:nth-of-type(2)::before { content: "Message"; }
+            td:nth-of-type(3)::before { content: "Gravité"; }
+            td:nth-of-type(4)::before { content: "Ligne"; }
+            td:nth-of-type(5)::before { content: "Actions"; }
+        }
+    </style>
+</head>
+<body>
+<h1>Alertes Info Trafic</h1>
+
+<!-- Formulaire ajout -->
+<h3>Nouvelle alerte</h3>
+<form id="new-alert-form">
+    <label>Message :</label>
+    <input type="text" id="alert-message" required>
+
+    <label>Gravité :</label>
+    <select id="alert-severity">
+        <option value="info">Info</option>
+        <option value="warning">⚠ Avertissement</option>
+        <option value="critical">🔥 Critique</option>
+        <option value="stop">🛑 Arrêt complet</option>
+    </select>
+
+    <label>Ligne :</label>
+    <select id="alert-route" required></select>
+
+    <button type="submit">Ajouter</button>
+</form>
+
+<!-- Tableau -->
+<h3>Liste des alertes</h3>
+<table id="alerts-table">
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>Message</th>
+        <th>Gravité</th>
+        <th>Ligne</th>
+        <th>Actions</th>
+    </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+width: 100%;
+max-width: 100%;
+table-layout: fixed; /* empêche les colonnes de déborder */
+}
+td, th {
+word-wrap: break-word; /* coupe le texte trop long */
+}
+
+<script>
+    // Ton script inchangé pour que tout fonctionne
+    const apiAlerts = "/alerts";
+    const apiRoutes = "/routes";
+    let routes = {};
+
+    function chargerRoutes() {
+      return fetch(apiRoutes)
+        .then(res => res.json())
+        .then(data => {
+          routes = data.routes || {};
+          const select = document.getElementById("alert-route");
+          select.innerHTML = "";
+
+          Object.values(routes).forEach(route => {
+            const opt = document.createElement("option");
+            opt.value = route.id;
+            opt.textContent = `${route.name} (#${route.id})`;
+            select.appendChild(opt);
+          });
+        })
+        .catch(err => console.error("Erreur fetch routes:", err));
+    }
+
+    function chargerAlertes() {
+      fetch(apiAlerts)
+        .then(res => res.json())
+        .then(data => afficherAlertes(data))
+        .catch(err => console.error("Erreur fetch alertes:", err));
+    }
+
+    function afficherAlertes(alertes) {
+      const tbody = document.querySelector("#alerts-table tbody");
+      tbody.innerHTML = "";
+
+      Object.values(alertes).forEach(alert => {
+        const tr = document.createElement("tr");
+        tr.className = alert.severity;
+
+        const route = Object.values(routes).find(r => r.id == alert.routeId);
+        const routeName = route ? route.name : `ID ${alert.routeId}`;
+
+        tr.innerHTML = `
+          <td>${alert.id}</td>
+          <td><input type="text" value="${alert.message}" /></td>
+          <td>
+            <select>
+              <option value="info" ${alert.severity==="info"?"selected":""}>Info</option>
+              <option value="warning" ${alert.severity==="warning"?"selected":""}>⚠ Avertissement</option>
+              <option value="critical" ${alert.severity==="critical"?"selected":""}>🔥 Critique</option>
+              <option value="stop" ${alert.severity==="stop"?"selected":""}>🛑 Arrêt complet</option>
+            </select>
+          </td>
+          <td>
+            <select>
+              ${Object.values(routes).map(route =>
+                `<option value="${route.id}" ${route.id===alert.routeId?"selected":""}>${route.name} (#${route.id})</option>`
+              ).join("")}
+            </select>
+          </td>
+          <td>
+            <button onclick="updateAlerte(${alert.id}, this)">💾 Sauvegarder</button>
+            <button onclick="deleteAlerte(${alert.id})">❌ Supprimer</button>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById("new-alert-form").addEventListener("submit", e => {
+      e.preventDefault();
+      const message = document.getElementById("alert-message").value;
+      const severity = document.getElementById("alert-severity").value;
+      const routeId = parseInt(document.getElementById("alert-route").value);
+
+      const payload = { id: 0, message, severity, routeId };
+
+      fetch(apiAlerts, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+        .then(res => res.json())
+        .then(() => {
+          chargerAlertes();
+          e.target.reset();
+        });
+    });
+
+    function updateAlerte(id, button) {
+      const tr = button.closest("tr");
+      const message = tr.querySelector("input[type=text]").value;
+      const severity = tr.querySelector("select").value;
+      const routeId = parseInt(tr.querySelectorAll("select")[1].value);
+
+      const payload = { id, message, severity, routeId };
+
+      fetch(apiAlerts, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+        .then(res => res.json())
+        .then(() => chargerAlertes());
+    }
+
+    function deleteAlerte(id) {
+      const payload = { id, message: "", severity: "info", routeId: 0 };
+
+      fetch(apiAlerts, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+        .then(res => res.json())
+        .then(() => chargerAlertes());
+    }
+
+    window.onload = () => {
+      chargerRoutes().then(chargerAlertes);
+    };
+</script>
+</body>
+</html>
