@@ -1,65 +1,50 @@
 package fr.mtrfranceaddon.fabric;
 
 import fr.mtrfranceaddon.mod.common.Init;
-import fr.mtrfranceaddon.mod.common.mtrfranceaddoninfotrafic.CustomRouteInfo;
 import fr.mtrfranceaddon.mod.common.mtrfranceaddoninfotrafic.MtrFranceAddonGetInfo;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
-import net.minecraft.util.WorldSavePath;
 
 import java.io.File;
-import java.util.Map;
 
 public class MTRFranceAddonFabricClient implements ClientModInitializer {
 
-
-    private long lastUpdate = 0;
-    private MtrFranceAddonGetInfo info;    @Override
+    @Override
     public void onInitializeClient() {
         Init.initClient();
-        info = new MtrFranceAddonGetInfo();
-        // Initialisation du dossier et JSON
-        ClientWorld initialWorld = net.minecraft.client.MinecraftClient.getInstance().world;
-        if (initialWorld != null) {
-            File worldDir = initialWorld.getServer().getSavePath(net.minecraft.util.WorldSavePath.ROOT).toFile();
-            MtrFranceAddonGetInfo.init(worldDir);
+
+        MinecraftClient mc = MinecraftClient.getInstance();
+        File worldDir = null;
+
+        // 1) Essaye serveur intégré (solo)
+        try {
+            if (mc.getServer() != null) {
+                worldDir = mc.getServer().getSavePath(net.minecraft.util.WorldSavePath.ROOT).toFile();
+            }
+        } catch (Throwable ignored) {}
+
+        // 2) fallback : dossier "saves" dans le runDirectory (toujours accessible)
+        if (worldDir == null) {
+            File run = mc.runDirectory;
+            File saves = new File(run, "saves");
+            worldDir = saves.exists() ? saves : run;
         }
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.world != null) {
-            File worldDir = client.getServer().getSavePath(WorldSavePath.ROOT).toFile();
-            MtrFranceAddonGetInfo.init(worldDir); // ← crée le dossier + JSON si absent
-        }
 
-        // Lancer le serveur local pour l’UI
-        new Thread(() -> {
-            MTRFranceAddonServer server = new MTRFranceAddonServer();
-            server.startServer();
-        }).start();
+        System.out.println("[MTR France Addon] using worldDir: " + worldDir.getAbsolutePath());
+        MtrFranceAddonGetInfo.init(worldDir);
+        ServerSaveResolver.register();
+        // Démarrer serveur HTTP (statique)
+        MTRFranceAddonServer.startServer();
 
-
-        // Tick client pour mise à jour toutes les 10 secondes
-        ClientTickEvents.END_CLIENT_TICK.register(c -> {
-            ClientWorld world = c.world; // déclaration unique
-
-            if (world != null) { // utilise la variable existante
-                // ton code ici
+        // Tick handler léger (ne change rien, mais peut servir pour chargements ultérieurs)
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            ClientWorld world = client.world;
+            if (world != null) {
+                // on peut appeler getAllCustomRoutes périodiquement pour détecter nouvelles routes
+                MtrFranceAddonGetInfo.getAllCustomRoutes();
             }
         });
-    }
-
-    private boolean canUpdate() {
-        long now = System.currentTimeMillis();
-        if (now - lastUpdate >= 10_000) {
-            lastUpdate = now;
-            return true;
-        }
-        return false;
-    }
-
-    private void updateRoutes() {
-        Map<Long, CustomRouteInfo> routes = MtrFranceAddonGetInfo.getAllCustomRoutes();
-        // Ici tu peux notifier le serveur/UI pour rafraîchir le tableau si nécessaire
     }
 }

@@ -1,20 +1,26 @@
 package fr.mtrfranceaddon.mod.common.mtrfranceaddoninfotrafic;
 
 public class CustomRouteInfo {
-        private long id;
-        private String name;
-        private int color;
-        private String description = "";
-        private int priority = 0;
+        public long id;
+        public String name;
+        public int color;
+        public String description;
+        public int priority;
+
+        // constructeur no-arg nécessaire pour Gson
+        public CustomRouteInfo() {}
 
         public CustomRouteInfo(long id, String name, int color) {
                 this.id = id;
                 this.name = name;
                 this.color = color;
+                this.description = "";
+                this.priority = 0;
         }
 
-        // Getters & setters
+        // getters / setters si besoin
         public long getId() { return id; }
+        public void setId(long id) { this.id = id; }
         public String getName() { return name; }
         public void setName(String name) { this.name = name; }
         public int getColor() { return color; }
