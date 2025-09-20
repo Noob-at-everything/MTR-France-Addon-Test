@@ -146,11 +146,22 @@ public class MTRFranceAddonServer {
     private static class HtmlHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            Map<Long, CustomRouteInfo> routeMap = MtrFranceAddonGetInfo.getAllCustomRoutes();
-            List<CustomRouteInfo> routes = new ArrayList<>(routeMap.values());
+            // Récupérer le fichier HTML depuis les ressources
+            InputStream is = MTRFranceAddonServer.class.getResourceAsStream("/mtr-france-addon.html");
+            if (is == null) {
+                // Si le fichier n'existe pas, renvoyer une erreur
+                String notFound = "<html><body><h1>Fichier HTML introuvable !</h1></body></html>";
+                byte[] out = notFound.getBytes("UTF-8");
+                exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
+                exchange.sendResponseHeaders(404, out.length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(out);
+                }
+                return;
+            }
 
-
-            byte[] out = html.toString().getBytes("UTF-8");
+            // Lire le contenu du fichier
+            byte[] out = is.readAllBytes();
             exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
             exchange.sendResponseHeaders(200, out.length);
             try (OutputStream os = exchange.getResponseBody()) {
